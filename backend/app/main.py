@@ -7,7 +7,7 @@ import os
 from app.database import create_db_and_tables
 from app.api.auth import router as auth_router
 from app.api.accounts import router as accounts_router
-from app.api.contacts import router as contacts_router
+from app.api.contact import router as contacts_router
 from app.api.transactions import router as transactions_router
 
 app = FastAPI(title="DiceBank API", version="1.0")

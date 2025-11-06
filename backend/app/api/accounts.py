@@ -9,6 +9,11 @@ from app.api.auth import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/accounts", tags=["accounts"])
 
+from pydantic import BaseModel
+
+class ActivateRequest(BaseModel):
+    active: bool
+
 def _mask_card(card: str | None) -> str | None:
     if not card or len(card) < 8:
         return card
@@ -28,14 +33,14 @@ def my_account(current_user: User = Depends(get_current_user), db: Session = Dep
 
 @router.patch("/activate")
 def activate_my_card(
-    active: bool,
+    payload: ActivateRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     acct = db.query(Account).filter(Account.user_id == current_user.id).first()
     if not acct:
         raise HTTPException(status_code=404, detail="Account not found")
-    acct.card_active = active
+    acct.card_active = payload.active
     db.add(acct)
     db.commit()
     db.refresh(acct)
@@ -45,14 +50,14 @@ def activate_my_card(
 @router.patch("/{user_id}/activate")
 def admin_activate_card(
     user_id: int,
-    active: bool,
+    payload: ActivateRequest,
     _: User = Depends(require_roles([RoleEnum.admin, RoleEnum.account_manager])),
     db: Session = Depends(get_db)
 ):
     acct = db.query(Account).filter(Account.user_id == user_id).first()
     if not acct:
         raise HTTPException(status_code=404, detail="Account not found")
-    acct.card_active = active
+    acct.card_active = payload.active
     db.add(acct)
     db.commit()
     return {"user_id": user_id, "card_active": acct.card_active}

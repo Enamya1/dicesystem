@@ -8,22 +8,14 @@ from app.api.auth import get_current_user
 from app.models.user import User
 from app.models.account import Account
 from app.models.transaction import Transaction, TxType
-from app.schemas.transaction import SendRequest, TxItem
+from app.schemas.transaction import TransactionCreate, TransactionResponse
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
-def _find_counterparty(db: Session, to_username: str | None, to_email: str | None) -> User | None:
-    q = db.query(User)
-    if to_username:
-        return q.filter(User.username == to_username).first()
-    if to_email:
-        return q.filter(User.email == to_email).first()
-    return None
-
 @router.post("/send", status_code=status.HTTP_201_CREATED)
-def send_money(payload: SendRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # locate receiver
-    receiver = _find_counterparty(db, payload.to_username, payload.to_email)
+def send_money(payload: TransactionCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # locate receiver by id
+    receiver = db.query(User).filter(User.id == payload.receiver_id).first()
     if not receiver:
         raise HTTPException(status_code=404, detail="Receiver not found")
     if receiver.id == current_user.id:
@@ -51,14 +43,14 @@ def send_money(payload: SendRequest, current_user: User = Depends(get_current_us
         sender_id=current_user.id,
         receiver_id=receiver.id,
         amount=payload.amount,
-        note=payload.note,
+        note=payload.description,
         tx_type=TxType.sent
     )
     t2 = Transaction(
         sender_id=current_user.id,
         receiver_id=receiver.id,
         amount=payload.amount,
-        note=payload.note,
+        note=payload.description,
         tx_type=TxType.received
     )
     db.add_all([t1, t2])
@@ -66,7 +58,7 @@ def send_money(payload: SendRequest, current_user: User = Depends(get_current_us
 
     return {"message": "Transfer completed"}
 
-@router.get("", response_model=list[TxItem])
+@router.get("", response_model=list[TransactionResponse])
 def list_transactions(
     direction: str | None = Query(None, description="sent | received (optional)"),
     limit: int = Query(50, ge=1, le=200),
@@ -79,24 +71,19 @@ def list_transactions(
     ).order_by(Transaction.created_at.desc())
 
     if direction in ("sent", "received"):
-        q = q.filter(Transaction.tx_type == direction)
+        enum_val = TxType.sent if direction == "sent" else TxType.received
+        q = q.filter(Transaction.tx_type == enum_val)
 
     rows = q.offset(offset).limit(limit).all()
 
-    out: list[TxItem] = []
+    out: list[TransactionResponse] = []
     for r in rows:
-        # pick counterparty relative to current user & tx_type
-        if r.tx_type == TxType.sent:
-            counter = db.query(User).filter(User.id == r.receiver_id).first()
-        else:
-            counter = db.query(User).filter(User.id == r.sender_id).first()
-
-        out.append(TxItem(
+        out.append(TransactionResponse(
             id=r.id,
-            tx_type=r.tx_type.value,
-            amount=r.amount,
-            note=r.note,
-            counterparty_username=counter.username if counter else None,
-            counterparty_email=counter.email if counter else None,
+            sender_id=r.sender_id,
+            receiver_id=r.receiver_id,
+            amount=float(r.amount),
+            description=r.note,
+            timestamp=r.created_at,
         ))
     return out
