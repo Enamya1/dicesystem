@@ -65,3 +65,4 @@ def custom_openapi():
     return app.openapi_schema
 
 app.openapi = custom_openapi
+# waaaaaaaaaaaaaaaaaaaa wld l97ba
