@@ -1,0 +1,58 @@
+# API Endpoints Documentation
+
+This document outlines the key API endpoints and provides examples for their usage.
+
+## 1. User Authentication
+
+### 1.1 Register User
+- **Endpoint:** `POST /api/auth/register`
+- **Description:** Registers a new user in the system.
+- **Example Request Body:**
+  ```json
+  {
+      "email": "test@example.com",
+      "username": "testuser",
+      "password": "testpassword",
+      "full_name": "Test User"
+  }
+  ```
+
+### 1.2 Login User
+- **Endpoint:** `POST /api/auth/login`
+- **Description:** Logs in a user and returns an authentication token. This token should be used in the `Authorization` header for subsequent authenticated requests.
+- **Example Request Body:**
+  ```json
+  {
+      "username": "adminuser",
+      "password": "adminpassword"
+  }
+  ```
+
+## 2. Admin Functionality
+
+### 2.1 Activate/Deactivate User
+- **Endpoint:** `PATCH /api/admin/users/{user_id}/activate`
+- **Description:** Activates or deactivates a user. Requires an admin authentication token.
+- **Parameters:**
+    - `{user_id}`: The ID of the user to activate/deactivate (e.g., `1`).
+    - `is_active`: Query parameter (`true` to activate, `false` to deactivate).
+- **Example URL (Deactivate User ID 1):**
+  `http://localhost:8000/api/admin/users/1/activate?is_active=false`
+- **Example URL (Activate User ID 1):**
+  `http://localhost:8000/api/admin/users/1/activate?is_active=true`
+- **Request Body:** None (all information is in the URL).
+
+### 2.2 Change User Role
+- **Endpoint:** `PATCH /api/admin/users/{user_id}/role`
+- **Description:** Changes the role of a specified user. Requires an admin authentication token.
+- **Parameters:**
+    - `{user_id}`: The ID of the user whose role is to be changed (e.g., `1`).
+- **Example URL:**
+  `http://localhost:8000/api/admin/users/1/role`
+- **Example Request Body (Change role to "support"):**
+  ```json
+  {
+      "role": "support"
+  }
+  ```
+  (Possible roles: "admin", "account_manager", "user", "support")

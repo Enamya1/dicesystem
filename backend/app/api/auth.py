@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User, RoleEnum
 from app.models.account import Account
-from app.schemas.user import UserRegister, LoginSchema, UserResponse
+from app.schemas.user import UserRegister, LoginSchema, UserResponse, UserStatusUpdate
 from app.utils.security import hash_password, verify_password
 from app.utils.cards import generate_unique_card_number
 
@@ -119,6 +119,9 @@ def login(payload: LoginSchema, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid username/email or password")
 
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated. Please contact support.")
+
     token = _create_session_token(user.id)
     return {
         "session_token": token,
@@ -147,12 +150,30 @@ def me(current_user: User = Depends(get_current_user)):
 
 @router.get("/admin/users")
 def list_users(
-    current_user: User = Depends(require_roles([RoleEnum.admin])),
-    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles([RoleEnum.admin])),\
+    db: Session = Depends(get_db),\
 ):
     """Admin-only: List all users."""
     users = db.query(User).all()
     return [
-        {"id": u.id, "username": u.username, "email": u.email, "role": u.role.value}
+        {"id": u.id, "username": u.username, "email": u.email, "role": u.role.value, "is_active": u.is_active}
         for u in users
     ]
+
+
+@router.put("/admin/users/{user_id}/status")
+def update_user_status(
+    user_id: int,
+    status_update: UserStatusUpdate,
+    current_user: User = Depends(require_roles([RoleEnum.admin])),
+    db: Session = Depends(get_db),
+):
+    """Admin-only: Activate or deactivate a user account."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_active = status_update.is_active
+    db.commit()
+    db.refresh(user)
+    return {"message": f"User {user.username} account status updated to {'active' if status_update.is_active else 'inactive'}"}
