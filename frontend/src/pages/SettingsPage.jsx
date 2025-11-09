@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const SettingsPage = ({ userData, onSave }) => {
+const SettingsPage = ({ userData, onSave, onAvatarUpdate }) => {
   const [username, setUsername] = useState(userData.username || '');
   const [firstName, setFirstName] = useState(userData.firstName || '');
   const [lastName, setLastName] = useState(userData.lastName || '');
-  const [name, setName] = useState(userData.name);
+  const [displayName, setDisplayName] = useState(userData.displayName || userData.name || '');
   const [email, setEmail] = useState(userData.email);
   const [phoneNumber, setPhoneNumber] = useState(userData.phoneNumber || '');
   const [country, setCountry] = useState(userData.country || '');
@@ -14,8 +14,32 @@ const SettingsPage = ({ userData, onSave }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [pwError, setPwError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
-  const initials = (userData.name || '')
+  useEffect(() => {
+    setUsername(userData.username || '');
+    setFirstName(userData.firstName || '');
+    setLastName(userData.lastName || '');
+    setDisplayName(userData.displayName || userData.name || '');
+    setEmail(userData.email);
+    setPhoneNumber(userData.phoneNumber || '');
+    setCountry(userData.country || '');
+    setCity(userData.city || '');
+    setAvatarPreview(null);
+  }, [userData]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
+
+  const initials = (displayName || userData.name || '')
     .split(' ')
     .filter(Boolean)
     .map((p) => p[0])
@@ -23,20 +47,59 @@ const SettingsPage = ({ userData, onSave }) => {
     .join('')
     .toUpperCase() || 'U';
 
-  const handleAvatarChange = (e) => {
+  const handleAvatarChange = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const url = URL.createObjectURL(file);
     setAvatarPreview(url);
+    if (!onAvatarUpdate) {
+      return;
+    }
+    setAvatarUploading(true);
+    setStatusMessage('');
+    setErrorMessage('');
+    try {
+      await onAvatarUpdate(file);
+      setStatusMessage('Profile photo updated');
+    } catch (error) {
+      setErrorMessage(error?.message || 'Failed to upload photo');
+      setAvatarPreview(null);
+    } finally {
+      setAvatarUploading(false);
+    }
   };
+
+  const handleSave = async () => {
+    if (!onSave) return;
+    const payload = {
+      username,
+      display_name: displayName,
+      phone_number: phoneNumber,
+      country,
+      city,
+    };
+    setSaving(true);
+    setStatusMessage('');
+    setErrorMessage('');
+    try {
+      await onSave(payload);
+      setStatusMessage('Profile updated successfully');
+    } catch (error) {
+      setErrorMessage(error?.message || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentAvatar = avatarPreview || userData.profilePicture;
 
   return (
   <div className="max-w-3xl mx-auto space-y-6">
     <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 flex items-center justify-between">
       <div className="flex items-center space-x-4">
         <div className="w-14 h-14 rounded-full overflow-hidden bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center">
-          {avatarPreview ? (
-            <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+          {currentAvatar ? (
+            <img src={currentAvatar} alt="Avatar" className="w-full h-full object-cover" />
           ) : (
             initials
           )}
@@ -49,11 +112,15 @@ const SettingsPage = ({ userData, onSave }) => {
       <div className="hidden sm:flex items-center gap-3">
         <img src="/logo.png" alt="DiceBank" className="w-10 h-10 object-contain" />
         <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
-        <label htmlFor="avatar-upload" className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors cursor-pointer">Change Photo</label>
+        <label htmlFor="avatar-upload" className="px-3 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors cursor-pointer">
+          {avatarUploading ? 'Uploading...' : 'Change Photo'}
+        </label>
       </div>
     </div>
     <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Account Settings</h2>
+      {statusMessage ? <p className="text-sm text-green-600 mb-4">{statusMessage}</p> : null}
+      {errorMessage ? <p className="text-sm text-red-600 mb-4">{errorMessage}</p> : null}
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
@@ -62,21 +129,21 @@ const SettingsPage = ({ userData, onSave }) => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="email" value={email} disabled readOnly className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-            <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" value={firstName} disabled readOnly className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-            <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" value={lastName} disabled readOnly className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Display Name</label>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -95,30 +162,12 @@ const SettingsPage = ({ userData, onSave }) => {
         </div>
         <div className="text-sm text-gray-500">Manage password below in Security Settings.</div>
         <button
-          onClick={() => {
-            const payload = { username, firstName, lastName, name, email, phoneNumber, country, city };
-            if (avatarPreview) payload.avatar = avatarPreview;
-            if (currentPassword || newPassword || confirmPassword) {
-              if (!currentPassword || !newPassword || !confirmPassword) {
-                setPwError('Fill all password fields');
-                return;
-              }
-              if (newPassword.length < 6) {
-                setPwError('New password must be at least 6 characters');
-                return;
-              }
-              if (newPassword !== confirmPassword) {
-                setPwError('New password and confirmation do not match');
-                return;
-              }
-              setPwError('');
-              payload.password = newPassword;
-            }
-            onSave && onSave(payload);
-          }}
-          className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-lg"
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 rounded-lg font-semibold hover:from-indigo-700 hover:to-indigo-800 transition-all shadow-lg disabled:opacity-60"
         >
-          Save Changes
+          {saving ? 'Saving...' : 'Save Changes'}
         </button>
       </div>
     </div>

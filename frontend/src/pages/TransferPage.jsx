@@ -2,14 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, CreditCard, Calendar, Repeat, FileUp, Save } from 'lucide-react';
 import { searchUsers, sendTransfer } from '../services/apiClient';
 
-const TransferPage = ({ contacts = [], onTransferComplete }) => {
+const TransferPage = ({ contacts = [], accountInfo, onTransferComplete }) => {
   const [recipientId, setRecipientId] = useState('');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [currencyFrom, setCurrencyFrom] = useState('USD');
   const [currencyTo, setCurrencyTo] = useState('USD');
   const [speed, setSpeed] = useState('standard');
-  const [sourceAccount, setSourceAccount] = useState('checking');
+  const [sourceAccount, setSourceAccount] = useState(null);
   const [schedule, setSchedule] = useState('now');
   const [scheduleDate, setScheduleDate] = useState('');
   const [recurring, setRecurring] = useState(false);
@@ -73,6 +73,7 @@ const TransferPage = ({ contacts = [], onTransferComplete }) => {
   const arrivalEta = { economy: '2-3 business days', standard: 'Next business day', instant: 'Within minutes' }[speed];
   const dailyLimit = 5000;
   const overLimit = totalDebit > dailyLimit && currencyFrom === 'USD';
+  const sourceAccountLabel = sourceAccount?.label ?? 'Primary account';
 
   const handleRecipientSearch = async () => {
     if (!recipientSearch.trim()) return;
@@ -110,7 +111,24 @@ const TransferPage = ({ contacts = [], onTransferComplete }) => {
     setRecipientSearch('');
   };
 
+  useEffect(() => {
+    if (accountInfo) {
+      setSourceAccount({
+        id: accountInfo.user_id,
+        label: accountInfo.card_number ? `Card ${accountInfo.card_number}` : 'Primary account',
+        balance: Number(accountInfo.balance ?? 0),
+        raw: accountInfo,
+      });
+    } else {
+      setSourceAccount(null);
+    }
+  }, [accountInfo]);
+
   const executeTransfer = async () => {
+    if (!sourceAccount) {
+      setTransferError('No funding account available.');
+      return;
+    }
     if (!recipientId) {
       setTransferError('Select a recipient');
       return;
@@ -265,11 +283,24 @@ const TransferPage = ({ contacts = [], onTransferComplete }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Source Account</label>
-              <select value={sourceAccount} onChange={(e) => setSourceAccount(e.target.value)} className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="checking">Checking - ****1234 - $7,240.12</option>
-                <option value="savings">Savings - ****7788 - $12,900.33</option>
-                <option value="card">Visa Card - ****5522</option>
-              </select>
+              {sourceAccount ? (
+                <div className="p-4 rounded-2xl border border-gray-200 bg-white shadow-sm flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Primary Account</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      ${sourceAccount.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {sourceAccount.label}
+                    {accountInfo?.card_active === false ? ' (card inactive)' : ''}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-2xl border border-dashed border-gray-300 text-sm text-gray-500">
+                  No account information available. Please ensure your profile has an active account.
+                </div>
+              )}
             </div>
 
             <div>
@@ -287,7 +318,7 @@ const TransferPage = ({ contacts = [], onTransferComplete }) => {
                   <option>EUR</option>
                   <option>GBP</option>
                 </select>
-                <div className="px-3 py-3 text-xl text-gray-600">-></div>
+                <div className="px-3 py-3 text-xl text-gray-600">-</div>
                 <select value={currencyTo} onChange={(e) => setCurrencyTo(e.target.value)} className="px-4 py-4 border border-gray-200 rounded-2xl text-lg font-medium w-28">
                   <option>USD</option>
                   <option>EUR</option>
@@ -381,7 +412,7 @@ const TransferPage = ({ contacts = [], onTransferComplete }) => {
               <h3 className="font-semibold text-gray-900 mb-4">Summary</h3>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-gray-600">Recipient</span><span className="font-medium text-gray-900">{recipient ? `${recipient.name}` : '-'}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">From</span><span className="font-medium text-gray-900">{sourceAccount}</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">From</span><span className="font-medium text-gray-900">{sourceAccountLabel}</span></div>
                 <div className="flex justify-between"><span className="text-gray-600">Send</span><span className="font-medium text-gray-900">{currencyFrom} {sendAmount.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span></div>
                 <div className="flex justify-between"><span className="text-gray-600">Rate</span><span className="font-medium text-gray-900">1 {currencyFrom} = {rate.toFixed(2)} {currencyTo}</span></div>
                 <div className="flex justify-between"><span className="text-gray-600">Fees</span><span className="font-medium text-gray-900">{currencyFrom} {fee.toFixed(2)}</span></div>
@@ -405,7 +436,7 @@ const TransferPage = ({ contacts = [], onTransferComplete }) => {
             <p className="text-sm text-gray-500 mb-4">Review the details below before sending</p>
             <div className="space-y-2 text-sm mb-4">
               <div className="flex justify-between"><span className="text-gray-600">To</span><span className="font-medium text-gray-900">{recipient?.name} - {recipient?.account}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">From</span><span className="font-medium text-gray-900">{sourceAccount}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">From</span><span className="font-medium text-gray-900">{sourceAccountLabel}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">Send</span><span className="font-medium text-gray-900">{currencyFrom} {sendAmount.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">Fees</span><span className="font-medium text-gray-900">{currencyFrom} {fee.toFixed(2)}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">Total debit</span><span className="font-bold text-gray-900">{currencyFrom} {totalDebit.toFixed(2)}</span></div>

@@ -21,10 +21,14 @@ export const clearSessionToken = () => {
 
 async function apiFetch(path, options = {}) {
   const token = getSessionToken();
+  const isFormData = options.body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
     ...(options.headers || {}),
   };
+
+  if (!isFormData && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -106,3 +110,18 @@ export const sendTransfer = (payload) =>
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+export const updateProfile = (payload) =>
+  apiFetch('/api/users/me', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+
+export const uploadAvatar = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return apiFetch('/api/users/me/avatar', {
+    method: 'POST',
+    body: formData,
+  });
+};

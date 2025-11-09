@@ -32,11 +32,24 @@ import {
   register as registerRequest,
   saveSessionToken,
   updateCardStatus as updateCardStatusRequest,
+  updateProfile as updateProfileRequest,
+  uploadAvatar as uploadAvatarRequest,
 } from './services/apiClient';
+
+const API_BASE_URL =
+  import.meta.env?.VITE_API_BASE_URL?.replace(/\/$/, '') ?? 'http://127.0.0.1:8000';
 
 const DEFAULT_USER_DATA = {
   name: 'DiceBank User',
   email: '',
+  username: '',
+  firstName: '',
+  lastName: '',
+  displayName: '',
+  phoneNumber: '',
+  country: '',
+  city: '',
+  profilePicture: '',
   balance: 0,
   savings: 0,
   income: 0,
@@ -133,6 +146,7 @@ const App = () => {
   const [recentTransactions, setRecentTransactions] = useState([]);
   const [quickContacts, setQuickContacts] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [accountInfo, setAccountInfo] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [appError, setAppError] = useState('');
@@ -199,13 +213,22 @@ const App = () => {
       ]);
 
       const fullName = `${profile.first_name ?? ''} ${profile.last_name ?? ''}`.trim() || profile.username;
+      const displayName = profile.display_name?.trim() || fullName || profile.username;
       const parsedBalance = account?.balance != null ? Number(account.balance) : null;
 
       setUserRole(profile.role);
       setUserData((prev) => ({
         ...prev,
-        name: fullName,
+        name: displayName,
+        displayName,
+        username: profile.username,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
         email: profile.email,
+        phoneNumber: profile.phone_number,
+        country: profile.country || '',
+        city: profile.city || '',
+        profilePicture: profile.profile_picture ? `${API_BASE_URL}${profile.profile_picture}` : '',
         balance: Number.isFinite(parsedBalance) ? parsedBalance : prev.balance,
       }));
 
@@ -222,6 +245,7 @@ const App = () => {
           }]
         : [];
 
+      setAccountInfo(account);
       setUserCards(formattedCards);
       setRecentTransactions(toTransactionRows(transactions, profile.id));
       setContacts(contactsResponse);
@@ -307,6 +331,22 @@ const App = () => {
     [hydrateUser]
   );
 
+  const handleProfileSave = useCallback(
+    async (payload) => {
+      await updateProfileRequest(payload);
+      await hydrateUser();
+    },
+    [hydrateUser]
+  );
+
+  const handleAvatarUpload = useCallback(
+    async (file) => {
+      await uploadAvatarRequest(file);
+      await hydrateUser();
+    },
+    [hydrateUser]
+  );
+
   const handleLogout = useCallback(async () => {
     try {
       await logoutRequest();
@@ -321,6 +361,7 @@ const App = () => {
       setRecentTransactions([]);
       setQuickContacts([]);
       setContacts([]);
+      setAccountInfo(null);
       setAppError('');
     }
   }, []);
@@ -365,6 +406,7 @@ const App = () => {
         return (
           <TransferPage
             contacts={contacts}
+            accountInfo={accountInfo}
             onTransferComplete={hydrateUser}
             isDarkMode={isDarkMode}
           />
@@ -410,12 +452,8 @@ const App = () => {
         return (
           <SettingsPage
             userData={userData}
-            onSave={(payload) => {
-              setUserData((prev) => ({ ...prev, ...payload }));
-              alert('Profile saved');
-            }}
-            isDarkMode={isDarkMode}
-            setIsDarkMode={setIsDarkMode}
+            onSave={handleProfileSave}
+            onAvatarUpdate={handleAvatarUpload}
           />
         );
       default:

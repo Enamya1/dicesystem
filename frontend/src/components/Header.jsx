@@ -4,6 +4,14 @@ import { Menu, Search, Bell, ChevronDown } from 'lucide-react';
 const Header = ({ currentPage, userData, userRole, setSidebarOpen, onNavigateSettings, onNavigateProfile, onLogout, notifications = [], unreadCount = 0, onMarkAllRead }) => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const displayName = userData.name || userData.displayName || userData.username || 'User';
+  const initials = (displayName || '')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'U';
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
@@ -19,7 +27,7 @@ const Header = ({ currentPage, userData, userRole, setSidebarOpen, onNavigateSet
                 .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
                 .join(' ')}
             </h1>
-            <p className="text-sm text-gray-500">Welcome back, {userData.name}</p>
+            <p className="text-sm text-gray-500">Welcome back, {displayName}</p>
           </div>
         </div>
 
@@ -71,11 +79,15 @@ const Header = ({ currentPage, userData, userRole, setSidebarOpen, onNavigateSet
             )}
           </div>
           <div className="flex items-center space-x-3 pl-4 border-l border-gray-200 cursor-pointer select-none" onClick={() => setUserMenuOpen((v) => !v)}>
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-              {userData.name.split(' ').map((n) => n[0]).join('')}
+            <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">
+              {userData.profilePicture ? (
+                <img src={userData.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                initials
+              )}
             </div>
             <div className="hidden md:block">
-              <p className="text-sm font-semibold text-gray-900">{userData.name}</p>
+              <p className="text-sm font-semibold text-gray-900">{displayName}</p>
               <p className="text-xs text-gray-500 capitalize">{userRole}</p>
             </div>
             <ChevronDown size={16} className="text-gray-400" />
