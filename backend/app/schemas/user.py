@@ -44,3 +44,7 @@ class UserSearchResult(BaseModel):
 
 class UserStatusUpdate(BaseModel):
     is_active: bool
+
+
+class UserRoleUpdate(BaseModel):
+    role: RoleEnum

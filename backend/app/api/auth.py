@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User, RoleEnum
 from app.models.account import Account
-from app.schemas.user import UserRegister, LoginSchema, UserResponse, UserStatusUpdate
+from app.schemas.user import UserRegister, LoginSchema, UserResponse, UserStatusUpdate, UserRoleUpdate
 from app.utils.security import hash_password, verify_password
 from app.utils.cards import generate_unique_card_number
 
@@ -177,3 +177,21 @@ def update_user_status(
     db.commit()
     db.refresh(user)
     return {"message": f"User {user.username} account status updated to {'active' if status_update.is_active else 'inactive'}"}
+
+
+@router.put("/admin/users/{user_id}/role")
+def update_user_role(
+    user_id: int,
+    role_update: UserRoleUpdate,
+    current_user: User = Depends(require_roles([RoleEnum.admin])),
+    db: Session = Depends(get_db),
+):
+    """Admin-only: Change a user's role."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.role = role_update.role
+    db.commit()
+    db.refresh(user)
+    return {"message": f"User {user.username} role updated to {role_update.role.value}"}
